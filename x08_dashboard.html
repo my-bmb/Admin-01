@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block page_title %}
+    <i class="bi bi-speedometer2"></i> Dashboard
+    <small class="text-muted fs-6">Order Management Overview</small>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <!-- Today's Orders -->
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card border-primary h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Today's Orders</h6>
+                        <h2 class="card-title">{{ today_orders }}</h2>
+                    </div>
+                    <div class="display-4 text-primary">
+                        <i class="bi bi-cart"></i>
+                    </div>
+                </div>
+                <p class="card-text text-muted small">
+                    Orders placed today
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Today's Revenue -->
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card border-success h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Today's Revenue</h6>
+                        <h2 class="card-title">{{ format_currency(today_revenue) }}</h2>
+                    </div>
+                    <div class="display-4 text-success">
+                        <i class="bi bi-currency-rupee"></i>
+                    </div>
+                </div>
+                <p class="card-text text-muted small">
+                    Total revenue today
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Orders -->
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card border-warning h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Pending Orders</h6>
+                        <h2 class="card-title">{{ pending_orders }}</h2>
+                    </div>
+                    <div class="display-4 text-warning">
+                        <i class="bi bi-clock-history"></i>
+                    </div>
+                </div>
+                <p class="card-text text-muted small">
+                    Awaiting processing
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delivered Orders -->
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card border-info h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-muted">Delivered (7 Days)</h6>
+                        <h2 class="card-title">{{ delivered_orders }}</h2>
+                    </div>
+                    <div class="display-4 text-info">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                </div>
+                <p class="card-text text-muted small">
+                    Last 7 days deliveries
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Orders -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-list-ul"></i> Recent Orders
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Amount</th>
+                        <th>Payment</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in recent_orders %}
+                    <tr>
+                        <td><strong>#{{ order.order_id }}</strong></td>
+                        <td>{{ order.user_name }}</td>
+                        <td>{{ format_currency(order.total_amount) }}</td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if order.payment_mode == 'online' else 'secondary' }}">
+                                {{ order.payment_mode|upper }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge {{ get_status_badge(order.status) }}">
+                                {{ order.status|title }}
+                            </span>
+                        </td>
+                        <td>{{ order.order_date_formatted }}</td>
+                        <td>
+                            <a href="{{ url_for('order_detail', order_id=order.order_id) }}" 
+                               class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4">
+                            <i class="bi bi-inbox display-6 text-muted"></i>
+                            <p class="mt-2">No recent orders found</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer text-end">
+        <a href="{{ url_for('orders_list') }}" class="btn btn-primary">
+            <i class="bi bi-arrow-right"></i> View All Orders
+        </a>
+    </div>
+</div>
+
+<!-- Quick Links -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-lightning"></i> Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <a href="{{ url_for('orders_list') }}?filter=today" 
+                           class="card quick-action-card text-decoration-none">
+                            <div class="card-body text-center">
+                                <i class="bi bi-calendar-day display-4 text-primary"></i>
+                                <h6 class="mt-2">Today's Orders</h6>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <a href="{{ url_for('orders_list') }}?filter=pending" 
+                           class="card quick-action-card text-decoration-none">
+                            <div class="card-body text-center">
+                                <i class="bi bi-clock display-4 text-warning"></i>
+                                <h6 class="mt-2">Pending Orders</h6>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <a href="{{ url_for('orders_list') }}?filter=delivered" 
+                           class="card quick-action-card text-decoration-none">
+                            <div class="card-body text-center">
+                                <i class="bi bi-check-circle display-4 text-success"></i>
+                                <h6 class="mt-2">Delivered</h6>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <a href="{{ url_for('orders_list') }}?filter=cod" 
+                           class="card quick-action-card text-decoration-none">
+                            <div class="card-body text-center">
+                                <i class="bi bi-cash-coin display-4 text-info"></i>
+                                <h6 class="mt-2">COD Orders</h6>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    .quick-action-card {
+        transition: transform 0.2s;
+        border: 1px solid #dee2e6;
+    }
+    .quick-action-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %}

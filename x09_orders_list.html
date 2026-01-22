@@ -1,0 +1,623 @@
+{% extends "base.html" %}
+
+{% block title %}Orders Management{% endblock %}
+
+{% block page_title %}
+    <i class="bi bi-list-check"></i> Orders Management
+    <small class="text-muted fs-6">Total Orders: {{ total_orders }}</small>
+{% endblock %}
+
+{% block page_actions %}
+<div class="btn-group" role="group">
+    <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="bi bi-filter"></i> Filter: {{ filter_type|title }}
+    </button>
+    <ul class="dropdown-menu">
+        <li><a class="dropdown-item {% if filter_type == 'all' %}active{% endif %}" 
+               href="{{ url_for('orders_list') }}?filter=all">All Orders</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item {% if filter_type == 'today' %}active{% endif %}" 
+               href="{{ url_for('orders_list') }}?filter=today">Today's Orders</a></li>
+        <li><a class="dropdown-item {% if filter_type == 'pending' %}active{% endif %}" 
+               href="{{ url_for('orders_list') }}?filter=pending">Pending</a></li>
+        <li><a class="dropdown-item {% if filter_type == 'delivered' %}active{% endif %}" 
+               href="{{ url_for('orders_list') }}?filter=delivered">Delivered</a></li>
+        <li><a class="dropdown-item {% if filter_type == 'cancelled' %}active{% endif %}" 
+               href="{{ url_for('orders_list') }}?filter=cancelled">Cancelled</a></li>
+        <li><a class="dropdown-item {% if filter_type == 'cod' %}active{% endif %}" 
+               href="{{ url_for('orders_list') }}?filter=cod">COD Only</a></li>
+    </ul>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped" id="ordersTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Phone</th>
+                        <th>Amount</th>
+                        <th>Payment</th>
+                        <th>Status</th>
+                        <th>Order Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td><strong>#{{ order.order_id }}</strong></td>
+                        <td>{{ order.user_name }}</td>
+                        <td>{{ order.user_phone }}</td>
+                        <td>{{ format_currency(order.total_amount) }}</td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if order.payment_mode == 'online' else 'secondary' }}">
+                                {{ order.payment_mode|upper }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge {{ get_status_badge(order.status) }}">
+                                {{ order.status|title }}
+                            </span>
+                        </td>
+                        <td>{{ order.order_date_formatted }}</td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <!-- 1️⃣ Item Details Button -->
+                                <button type="button" class="btn btn-sm btn-outline-info" 
+                                        onclick="showItemDetails({{ order.order_id }})"
+                                        title="View Item Details">
+                                    <i class="bi bi-box-seam"></i>
+                                </button>
+                                
+                                <!-- 2️⃣ Payment Details Button -->
+                                <button type="button" class="btn btn-sm btn-outline-warning"
+                                        onclick="showPaymentDetails({{ order.order_id }})"
+                                        title="Payment Details">
+                                    <i class="bi bi-credit-card"></i>
+                                </button>
+                                
+                                <!-- 3️⃣ Customer Details Button -->
+                                <button type="button" class="btn btn-sm btn-outline-success"
+                                        onclick="showCustomerDetails({{ order.order_id }})"
+                                        title="Customer Details">
+                                    <i class="bi bi-person"></i>
+                                </button>
+                                
+                                <!-- 4️⃣ Edit Status Button -->
+                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                        onclick="showStatusModal({{ order.order_id }})"
+                                        title="Edit Order Status">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                
+                                <!-- View Full Details Button -->
+                                <a href="{{ url_for('order_detail', order_id=order.order_id) }}" 
+                                   class="btn btn-sm btn-outline-dark" title="Full Details">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center py-4">
+                            <i class="bi bi-inbox display-6 text-muted"></i>
+                            <p class="mt-2">No orders found</p>
+                            <a href="{{ url_for('orders_list') }}" class="btn btn-primary">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 1️⃣ Item Details Modal -->
+<div class="modal fade" id="itemDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-box-seam"></i> Order Items Details
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="itemDetailsContent">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-info" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading order items...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 2️⃣ Payment Details Modal -->
+<div class="modal fade" id="paymentDetailsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="bi bi-credit-card"></i> Payment Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="paymentDetailsContent">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-warning" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading payment details...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 3️⃣ Customer Details Modal -->
+<div class="modal fade" id="customerDetailsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-person"></i> Customer Details
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="customerDetailsContent">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-success" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading customer details...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 4️⃣ Edit Status Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil"></i> Update Order Status
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="statusModalContent">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading status options...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentOrderId = null;
+    
+    // 1️⃣ Item Details Modal
+    function showItemDetails(orderId) {
+        currentOrderId = orderId;
+        const modal = new bootstrap.Modal(document.getElementById('itemDetailsModal'));
+        
+        // Load data
+        $.ajax({
+            url: `/admin/api/order/${orderId}/items`,
+            method: 'GET',
+            success: function(response) {
+                if (response.success) {
+                    let html = `
+                        <h6>Order #${response.order_id} - Items (${response.total_items})</h6>
+                        <p class="text-muted mb-3">Total Amount: <strong>${response.total_amount.toFixed(2)}</strong></p>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th>Description</th>
+                                        <th>Qty</th>
+                                        <th>Price</th>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+                    
+                    response.items.forEach(item => {
+                        html += `
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <img src="${item.photo}" alt="${item.name}" 
+                                             class="rounded me-2" style="width: 50px; height: 50px; object-fit: cover;">
+                                        <div>
+                                            <strong>${item.name}</strong><br>
+                                            <small class="text-muted">${item.type}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>${item.description}</td>
+                                <td>${item.quantity}</td>
+                                <td>₹${item.price.toFixed(2)}</td>
+                                <td><strong>₹${item.total.toFixed(2)}</strong></td>
+                            </tr>`;
+                    });
+                    
+                    html += `</tbody></table></div>`;
+                    $('#itemDetailsContent').html(html);
+                } else {
+                    $('#itemDetailsContent').html(`
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle"></i> ${response.message}
+                        </div>`);
+                }
+            },
+            error: function() {
+                $('#itemDetailsContent').html(`
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i> Failed to load item details
+                    </div>`);
+            }
+        });
+        
+        modal.show();
+    }
+    
+    // 2️⃣ Payment Details Modal
+    function showPaymentDetails(orderId) {
+        currentOrderId = orderId;
+        const modal = new bootstrap.Modal(document.getElementById('paymentDetailsModal'));
+        
+        $.ajax({
+            url: `/admin/api/order/${orderId}/payment`,
+            method: 'GET',
+            success: function(response) {
+                if (response.success) {
+                    const payment = response.payment;
+                    let html = `
+                        <form id="paymentForm">
+                            <input type="hidden" name="order_id" value="${orderId}">
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Order Amount</label>
+                                <input type="text" class="form-control" value="₹${payment.total_amount}" readonly>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Payment Mode</label>
+                                <input type="text" class="form-control" value="${payment.payment_mode}" readonly>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Payment Status</label>
+                                <select class="form-select" name="payment_status" id="paymentStatus">
+                                    ${response.status_options.map(status => 
+                                        `<option value="${status}" ${payment.payment_status === status ? 'selected' : ''}>
+                                            ${status.charAt(0).toUpperCase() + status.slice(1)}
+                                        </option>`
+                                    ).join('')}
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Transaction ID</label>
+                                <input type="text" class="form-control" name="transaction_id" 
+                                       value="${payment.transaction_id || ''}" 
+                                       placeholder="Enter transaction ID">
+                            </div>
+                            
+                            ${payment.payment_date_formatted ? `
+                                <div class="mb-3">
+                                    <label class="form-label">Payment Date</label>
+                                    <input type="text" class="form-control" value="${payment.payment_date_formatted}" readonly>
+                                </div>` : ''}
+                            
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> Changes will be saved immediately
+                            </div>
+                            
+                            <div class="text-end">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="bi bi-save"></i> Save Changes
+                                </button>
+                            </div>
+                        </form>`;
+                    
+                    $('#paymentDetailsContent').html(html);
+                    
+                    // Handle form submission
+                    $('#paymentForm').on('submit', function(e) {
+                        e.preventDefault();
+                        savePaymentDetails(orderId);
+                    });
+                } else {
+                    $('#paymentDetailsContent').html(`
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle"></i> ${response.message}
+                        </div>`);
+                }
+            },
+            error: function() {
+                $('#paymentDetailsContent').html(`
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i> Failed to load payment details
+                    </div>`);
+            }
+        });
+        
+        modal.show();
+    }
+    
+    function savePaymentDetails(orderId) {
+        const formData = {
+            payment_status: $('#paymentStatus').val(),
+            transaction_id: $('input[name="transaction_id"]').val()
+        };
+        
+        $.ajax({
+            url: `/admin/api/order/${orderId}/payment/update`,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                if (response.success) {
+                    showAlert('success', response.message);
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showAlert('danger', response.message);
+                }
+            },
+            error: function() {
+                showAlert('danger', 'Failed to save payment details');
+            }
+        });
+    }
+    
+    // 3️⃣ Customer Details Modal
+    function showCustomerDetails(orderId) {
+        currentOrderId = orderId;
+        const modal = new bootstrap.Modal(document.getElementById('customerDetailsModal'));
+        
+        $.ajax({
+            url: `/admin/api/order/${orderId}/customer`,
+            method: 'GET',
+            success: function(response) {
+                if (response.success) {
+                    const customer = response.customer;
+                    let html = `
+                        <div class="text-center mb-4">
+                            <img src="${customer.profile_pic}" alt="${customer.name}" 
+                                 class="rounded-circle" style="width: 100px; height: 100px; object-fit: cover;">
+                            <h5 class="mt-2">${customer.name}</h5>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label"><i class="bi bi-telephone"></i> Phone</label>
+                            <input type="text" class="form-control" value="${customer.phone}" readonly>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label"><i class="bi bi-envelope"></i> Email</label>
+                            <input type="text" class="form-control" value="${customer.email}" readonly>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label"><i class="bi bi-geo-alt"></i> Address</label>
+                            <textarea class="form-control" rows="3" readonly>${customer.address}</textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label"><i class="bi bi-truck"></i> Delivery Location</label>
+                            <textarea class="form-control" rows="2" readonly>${customer.delivery_location}</textarea>
+                        </div>`;
+                    
+                    if (customer.maps_link) {
+                        html += `
+                            <div class="mb-3">
+                                <a href="${customer.maps_link}" target="_blank" class="btn btn-outline-success w-100">
+                                    <i class="bi bi-map"></i> View on Google Maps
+                                </a>
+                            </div>`;
+                    }
+                    
+                    html += `<div class="text-center">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    <i class="bi bi-x-circle"></i> Close
+                                </button>
+                            </div>`;
+                    
+                    $('#customerDetailsContent').html(html);
+                } else {
+                    $('#customerDetailsContent').html(`
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle"></i> ${response.message}
+                        </div>`);
+                }
+            },
+            error: function() {
+                $('#customerDetailsContent').html(`
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i> Failed to load customer details
+                    </div>`);
+            }
+        });
+        
+        modal.show();
+    }
+    
+    // 4️⃣ Edit Status Modal
+    function showStatusModal(orderId) {
+        currentOrderId = orderId;
+        const modal = new bootstrap.Modal(document.getElementById('statusModal'));
+        
+        $.ajax({
+            url: `/admin/api/order/${orderId}/status`,
+            method: 'GET',
+            success: function(response) {
+                if (response.success) {
+                    let html = `
+                        <form id="statusForm">
+                            <input type="hidden" name="order_id" value="${orderId}">
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Current Status</label>
+                                <div class="alert alert-${getStatusColor(response.current_status)}">
+                                    <strong>${response.current_status.toUpperCase()}</strong>
+                                </div>
+                            </div>`;
+                    
+                    if (response.available_statuses.length > 0) {
+                        html += `
+                            <div class="mb-3">
+                                <label class="form-label">Change Status To</label>
+                                <select class="form-select" name="status" id="orderStatus">
+                                    <option value="">Select new status</option>
+                                    ${response.available_statuses.map(status => 
+                                        `<option value="${status}">
+                                            ${status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')}
+                                        </option>`
+                                    ).join('')}
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Notes (Optional)</label>
+                                <textarea class="form-control" name="notes" rows="3" 
+                                          placeholder="Add any notes about this status change..."></textarea>
+                            </div>
+                            
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle"></i> 
+                                Status changes cannot be undone. Please confirm carefully.
+                            </div>
+                            
+                            <div class="text-end">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-circle"></i> Update Status
+                                </button>
+                            </div>`;
+                    } else {
+                        html += `
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> 
+                                No further status changes available for this order.
+                            </div>
+                            <div class="text-center">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            </div>`;
+                    }
+                    
+                    html += `</form>`;
+                    $('#statusModalContent').html(html);
+                    
+                    // Handle form submission
+                    $('#statusForm').on('submit', function(e) {
+                        e.preventDefault();
+                        updateOrderStatus(orderId);
+                    });
+                } else {
+                    $('#statusModalContent').html(`
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle"></i> ${response.message}
+                        </div>`);
+                }
+            },
+            error: function() {
+                $('#statusModalContent').html(`
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i> Failed to load status options
+                    </div>`);
+            }
+        });
+        
+        modal.show();
+    }
+    
+    function updateOrderStatus(orderId) {
+        const newStatus = $('#orderStatus').val();
+        const notes = $('textarea[name="notes"]').val();
+        
+        if (!newStatus) {
+            showAlert('warning', 'Please select a new status');
+            return;
+        }
+        
+        $.ajax({
+            url: `/admin/api/order/${orderId}/status/update`,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ status: newStatus, notes: notes }),
+            success: function(response) {
+                if (response.success) {
+                    showAlert('success', response.message);
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showAlert('danger', response.message);
+                }
+            },
+            error: function() {
+                showAlert('danger', 'Failed to update order status');
+            }
+        });
+    }
+    
+    // Utility functions
+    function getStatusColor(status) {
+        const colors = {
+            'pending': 'warning',
+            'confirmed': 'info',
+            'assigned': 'primary',
+            'out_for_delivery': 'secondary',
+            'delivered': 'success',
+            'cancelled': 'danger'
+        };
+        return colors[status] || 'secondary';
+    }
+    
+    function showAlert(type, message) {
+        const alert = $(`
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `);
+        
+        $('.container-fluid').prepend(alert);
+        
+        setTimeout(() => {
+            alert.alert('close');
+        }, 5000);
+    }
+</script>
+{% endblock %}

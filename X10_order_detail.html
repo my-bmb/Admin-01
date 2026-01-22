@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+
+{% block title %}Order #{{ order.order_id }} Details{% endblock %}
+
+{% block page_title %}
+    <i class="bi bi-receipt"></i> Order #{{ order.order_id }}
+    <small class="text-muted fs-6">{{ order.status|title }} • {{ order.order_date_formatted }}</small>
+{% endblock %}
+
+{% block page_actions %}
+<div class="btn-group" role="group">
+    <a href="{{ url_for('orders_list') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Orders
+    </a>
+    
+    {% if available_statuses %}
+    <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="bi bi-pencil"></i> Update Status
+    </button>
+    <ul class="dropdown-menu">
+        {% for status in available_statuses %}
+        <li><a class="dropdown-item" href="#" onclick="updateStatus('{{ status }}')">
+            Change to {{ status|title }}
+        </a></li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Order Summary -->
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-box-seam"></i> Order Items
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Description</th>
+                                <th>Qty</th>
+                                <th>Price</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <img src="{{ item.photo_url }}" alt="{{ item.item_name }}" 
+                                             class="rounded me-2" style="width: 60px; height: 60px; object-fit: cover;">
+                                        <div>
+                                            <strong>{{ item.item_name }}</strong><br>
+                                            <small class="text-muted">{{ item.item_type|title }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{ item.item_description or 'No description' }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td>{{ format_currency(item.price) }}</td>
+                                <td><strong>{{ format_currency(item.total) }}</strong></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-dark">
+                            <tr>
+                                <td colspan="4" class="text-end"><strong>Total Amount:</strong></td>
+                                <td><strong>{{ format_currency(order.total_amount) }}</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Delivery Information -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-truck"></i> Delivery Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Delivery Location</h6>
+                        <p class="text-muted">{{ order.delivery_location }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Delivery Status</h6>
+                        <span class="badge {{ get_status_badge(order.status) }} fs-6">
+                            {{ order.status|title }}
+                        </span>
+                        
+                        {% if order.delivery_date_formatted %}
+                        <div class="mt-2">
+                            <small class="text-muted">Delivered on: {{ order.delivery_date_formatted }}</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Order Details Sidebar -->
+    <div class="col-lg-4">
+        <!-- Order Information -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-info-circle"></i> Order Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <th>Order ID:</th>
+                        <td>#{{ order.order_id }}</td>
+                    </tr>
+                    <tr>
+                        <th>Order Date:</th>
+                        <td>{{ order.order_date_formatted }}</td>
+                    </tr>
+                    <tr>
+                        <th>Status:</th>
+                        <td>
+                            <span class="badge {{ get_status_badge(order.status) }}">
+                                {{ order.status|title }}
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Payment Mode:</th>
+                        <td>{{ order.payment_mode|upper }}</td>
+                    </tr>
+                    <tr>
+                        <th>Payment Status:</th>
+                        <td>
+                            <span class="badge bg-{{ 'success' if order.payment_status == 'completed' else 'warning' }}">
+                                {{ order.payment_status|title if order.payment_status else 'Pending' }}
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Total Amount:</th>
+                        <td><strong>{{ format_currency(order.total_amount) }}</strong></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Customer Information -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-person"></i> Customer Information
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if customer %}
+                <div class="text-center mb-3">
+                    <img src="{{ customer.profile_pic_url }}" alt="{{ customer.full_name }}" 
+                         class="rounded-circle" style="width: 80px; height: 80px; object-fit: cover;">
+                    <h6 class="mt-2">{{ customer.full_name }}</h6>
+                </div>
+                
+                <table class="table table-sm">
+                    <tr>
+                        <th>Phone:</th>
+                        <td>{{ customer.phone }}</td>
+                    </tr>
+                    <tr>
+                        <th>Email:</th>
+                        <td>{{ customer.email }}</td>
+                    </tr>
+                    <tr>
+                        <th>Address:</th>
+                        <td>{{ customer.full_address or 'No address saved' }}</td>
+                    </tr>
+                </table>
+                
+                {% if customer.latitude and customer.longitude %}
+                <div class="mt-3">
+                    <a href="https://www.google.com/maps?q={{ customer.latitude }},{{ customer.longitude }}" 
+                       target="_blank" class="btn btn-outline-success btn-sm w-100">
+                        <i class="bi bi-map"></i> View on Google Maps
+                    </a>
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="text-center text-muted">
+                    <i class="bi bi-person-x display-6"></i>
+                    <p class="mt-2">Customer information not available</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Payment Information -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-credit-card"></i> Payment Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <th>Amount:</th>
+                        <td>{{ format_currency(order.total_amount) }}</td>
+                    </tr>
+                    <tr>
+                        <th>Mode:</th>
+                        <td>{{ order.payment_mode|upper }}</td>
+                    </tr>
+                    <tr>
+                        <th>Status:</th>
+                        <td>{{ order.payment_status|title if order.payment_status else 'Pending' }}</td>
+                    </tr>
+                    {% if order.transaction_id %}
+                    <tr>
+                        <th>Transaction ID:</th>
+                        <td><code>{{ order.transaction_id }}</code></td>
+                    </tr>
+                    {% endif %}
+                    {% if order.payment_date_formatted %}
+                    <tr>
+                        <th>Payment Date:</th>
+                        <td>{{ order.payment_date_formatted }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+                
+                {% if order.payment_status != 'completed' and order.payment_mode == 'online' %}
+                <div class="mt-3">
+                    <button class="btn btn-warning btn-sm w-100" onclick="markAsPaid()">
+                        <i class="bi bi-check-circle"></i> Mark as Paid
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Status Update Modal -->
+<div class="modal fade" id="statusUpdateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Update Order Status</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="statusUpdateContent">
+                    <div class="mb-3">
+                        <label class="form-label">New Status</label>
+                        <input type="text" class="form-control" id="newStatusInput" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes (Optional)</label>
+                        <textarea class="form-control" id="statusNotes" rows="3" 
+                                  placeholder="Add any notes about this status change..."></textarea>
+                    </div>
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> 
+                        Status changes cannot be undone. Please confirm carefully.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="confirmStatusUpdate()">
+                    <i class="bi bi-check-circle"></i> Confirm Update
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let selectedStatus = '';
+    
+    function updateStatus(status) {
+        selectedStatus = status;
+        $('#newStatusInput').val(status.charAt(0).toUpperCase() + status.slice(1));
+        $('#statusNotes').val('');
+        
+        const modal = new bootstrap.Modal(document.getElementById('statusUpdateModal'));
+        modal.show();
+    }
+    
+    function confirmStatusUpdate() {
+        const notes = $('#statusNotes').val();
+        
+        $.ajax({
+            url: `/admin/api/order/${ {{ order.order_id }} }/status/update`,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ 
+                status: selectedStatus, 
+                notes: notes 
+            }),
+            success: function(response) {
+                if (response.success) {
+                    showAlert('success', response.message);
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showAlert('danger', response.message);
+                }
+            },
+            error: function() {
+                showAlert('danger', 'Failed to update order status');
+            }
+        });
+        
+        const modal = bootstrap.Modal.getInstance(document.getElementById('statusUpdateModal'));
+        modal.hide();
+    }
+    
+    function markAsPaid() {
+        if (confirm('Mark this order as paid?')) {
+            $.ajax({
+                url: `/admin/api/order/${ {{ order.order_id }} }/payment/update`,
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ 
+                    payment_status: 'completed',
+                    transaction_id: 'MANUAL_' + Date.now()
+                }),
+                success: function(response) {
+                    if (response.success) {
+                        showAlert('success', 'Order marked as paid');
+                        setTimeout(() => {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        showAlert('danger', response.message);
+                    }
+                },
+                error: function() {
+                    showAlert('danger', 'Failed to update payment status');
+                }
+            });
+        }
+    }
+    
+    function showAlert(type, message) {
+        const alert = $(`
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `);
+        
+        $('.container-fluid').prepend(alert);
+        
+        setTimeout(() => {
+            alert.alert('close');
+        }, 5000);
+    }
+</script>
+{% endblock %}
